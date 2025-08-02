@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StoryMaker - AI Dynamic Image Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+</head>
+<body class="bg-gradient-to-br from-purple-50 to-blue-50 min-h-screen">
+    <div class="container mx-auto px-4 py-8" x-data="storyMaker()">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-900 mb-4">🎨 AI StoryMaker</h1>
+            <p class="text-lg text-gray-600 max-w-2xl mx-auto">
+                Transform your photos into creative AI-generated story scenes using Fal AI's advanced technology
+            </p>
+            <div class="flex justify-center gap-4 mt-4">
+                <span class="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm">✅ Fal AI Powered</span>
+                <span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">🚀 High Quality</span>
+                <span class="px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm">⚡ Fast Generation</span>
+            </div>
+        </div>
+
+        <!-- API Status -->
+        <div x-show="apiStatus" class="max-w-4xl mx-auto mb-6">
+            <div :class="apiStatus.fal_api_configured ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'" 
+                 class="border rounded-lg p-4 text-center">
+                <span x-show="apiStatus.fal_api_configured">🟢 Fal AI Connected - Ready to Generate</span>
+                <span x-show="!apiStatus.fal_api_configured">🔴 Fal AI Not Configured - Check API Key</span>
+            </div>
+        </div>
+
+        <!-- Upload Form -->
+        <div class="max-w-4xl mx-auto">
+            <form @submit.prevent="generateImages" class="space-y-6">
+                <!-- Image Upload Section -->
+                <div class="grid md:grid-cols-2 gap-6">
+                    <!-- Face Image Upload -->
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <h3 class="text-lg font-semibold mb-4 flex items-center">
+                            📸 Face Image (Required)
+                        </h3>
+                        <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                            <div x-show="!faceImagePreview" @click="$refs.faceInput.click()" 
+                                 class="cursor-pointer hover:border-blue-400 transition-colors">
+                                <div class="text-4xl mb-2">📤</div>
+                                <p class="text-gray-600">Click to upload face image</p>
+                                <p class="text-xs text-gray-400 mt-1">Max size: {{ (max_file_size / 1024 / 1024)|round }}MB</p>
+                            </div>
+                            <div x-show="faceImagePreview" class="relative">
+                                <img :src="faceImagePreview" class="max-h-48 mx-auto rounded shadow-md">
+                                <button type="button" @click="clearFaceImage" 
+                                        class="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white rounded-full w-8 h-8 flex items-center justify-center transition-colors">
+                                    ✕
+                                </button>
+                            </div>
+                        </div>
+                        <input type="file" x-ref="faceInput" @change="handleFaceImageChange" 
+                               accept="image/jpeg,image/png,image/webp" required class="hidden">
+                    </div>
+
+                    <!-- Mask Image Upload -->
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <h3 class="text-lg font-semibold mb-4 flex items-center">
+                            🎭 Mask Image (Optional)
+                        </h3>
+                        <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                            <div x-show="!maskImagePreview" @click="$refs.maskInput.click()" 
+                                 class="cursor-pointer hover:border-blue-400 transition-colors">
+                                <div class="text-4xl mb-2">🖼️</div>
+                                <p class="text-gray-600">Click to upload mask image</p>
+                                <p class="text-xs text-gray-400 mt-1">Used for inpainting/outpainting</p>
+                            </div>
+                            <div x-show="maskImagePreview" class="relative">
+                                <img :src="maskImagePreview" class="max-h-48 mx-auto rounded shadow-md">
+                                <button type="button" @click="clearMaskImage" 
+                                        class="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white rounded-full w-8 h-8 flex items-center justify-center transition-colors">
+                                    ✕
+                                </button>
+                            </div>
+                        </div>
+                        <input type="file" x-ref="maskInput" @change="handleMaskImageChange" 
+                               accept="image/jpeg,image/png,image/webp" class="hidden">
+                    </div>
+                </div>
+
+                <!-- Prompt Section -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-lg font-semibold mb-4 flex items-center">
+                        ✨ Story Prompt
+                    </h3>
+                    <textarea x-model="prompt" required
+                              placeholder="e.g., a person reading a book under a cherry blossom tree in Kyoto, cinematic lighting, professional photography"
+                              class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                              rows="3"></textarea>
+                    
+                    <div class="mt-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Example Prompts:</label>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            <template x-for="example in examplePrompts">
+                                <button type="button" @click="prompt = example"
+                                        class="px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-800 rounded-lg text-sm text-left transition-colors"
+                                        x-text="example"></button>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Advanced Settings -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-lg font-semibold mb-4 flex items-center">
+                        ⚙️ Generation Settings
+                    </h3>
+                    <div class="grid md:grid-cols-3 gap-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Negative Prompt:</label>
+                            <textarea x-model="negativePrompt"
+                                      class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                                      rows="3"></textarea>
+                        </div>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                    Number of Images: <span x-text="numImages" class="font-bold text-blue-600"></span>
+                                </label>
+                                <input type="range" x-model="numImages" min="1" max="8" 
+                                       class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                                <div class="flex justify-between text-xs text-gray-500 mt-1">
+                                    <span>1</span><span>8</span>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                    Guidance Scale: <span x-text="guidanceScale" class="font-bold text-blue-600"></span>
+                                </label>
+                                <input type="range" x-model="guidanceScale" min="1" max="20" step="0.5"
+                                       class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                                <div class="flex justify-between text-xs text-gray-500 mt-1">
+                                    <span>1</span><span>20</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                    Inference Steps: <span x-text="numInferenceSteps" class="font-bold text-blue-600"></span>
+                                </label>
+                                <input type="range" x-model="numInferenceSteps" min="10" max="50" step="5"
+                                       class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                                <div class="flex justify-between text-xs text-gray-500 mt-1">
+                                    <span>10</span><span>50</span>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Image Size:</label>
+                                <select x-model="imageSize" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                    <option value="1024x1024">1024×1024 (Square)</option>
+                                    <option value="1024x768">1024×768 (Landscape)</option>
+                                    <option value="768x1024">768×1024 (Portrait)</option>
+                                    <option value="1280x720">1280×720 (HD)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Generate Button -->
+                <div class="text-center">
+                    <button type="submit" :disabled="isGenerating || !prompt || !faceImagePreview"
+                            class="px-8 py-4 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold rounded-lg shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 transform hover:scale-105">
+                        <span x-show="!isGenerating" class="flex items-center justify-center">
+                            <span class="text-2xl mr-2">🎨</span>
+                            Generate Story Images
+                        </span>
+                        <span x-show="isGenerating" class="flex items-center justify-center">
+                            <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
+                            <span x-text="generationStatus">Generating...</span>
+                        </span>
+                    </button>
+                    <p class="text-sm text-gray-500 mt-2">
+                        Estimated time: <span x-text="estimatedTime"></span> seconds
+                    </p>
+                </div>
+            </form>
+
+            <!-- Progress Bar -->
+            <div x-show="isGenerating" class="max-w-4xl mx-auto mt-6">
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-medium text-gray-700">Generation Progress</span>
+                        <span class="text-sm text-gray-500" x-text="progressPercent + '%'"></span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div class="bg-gradient-to-r from-purple-600 to-blue-600 h-2 rounded-full transition-all duration-300" 
+                             :style="`width: ${progressPercent}%`"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results Section -->
+            <div x-show="results" class="mt-8 bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-semibold mb-4 flex items-center">
+                    <span x-show="results?.success">🎉 Generated Images</span>
+                    <span x-show="results?.success === false">❌ Generation Failed</span>
+                </h3>
+                
+                <div x-show="results?.success === false" class="text-red-600 bg-red-50 p-4 rounded-lg">
+                    <p x-text="results?.error"></p>
+                </div>
+                
+                <div x-show="results?.success" class="space-y-6">
+                    <div class="flex justify-between items-center bg-gray-50 p-4 rounded-lg">
+                        <div class="text-sm text-gray-600">
+                            <p>✅ Generated <span x-text="results?.images?.length || 0" class="font-bold"></span> images</p>
+                            <p>⏱️ Generation time: <span x-text="results?.generation_time || 'N/A'" class="font-bold"></span>s</p>
+                            <p>🤖 Model: <span x-text="results?.model_used || 'fal-ai/flux'" class="font-bold"></span></p>
+                        </div>
+                        <button @click="downloadAll" 
+                                class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors">
+                            📥 Download All
+                        </button>
+                    </div>
+                    
+                    <div class="grid md:grid-cols-2 gap-4">
+                        <template x-for="(image, index) in results?.images || []">
+                            <div class="relative group bg-gray-100 rounded-lg overflow-hidden">
+                                <img :src="image" :alt="'Generated image ' + (index + 1)" 
+                                     class="w-full h-64 object-cover group-hover:scale-105 transition-transform duration-300">
+                                <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all duration-300 flex items-center justify-center">
+                                    <div class="opacity-0 group-hover:opacity-100 transition-opacity space-y-2">
+                                        <button @click="downloadImage(image, index)"
+                                                class="block w-full px-4 py-2 bg-white text-gray-800 rounded-lg shadow-lg hover:bg-gray-100 transition-colors">
+                                            📥 Download
+                                        </button>
+                                        <button @click="shareImage(image)"
+                                                class="block w-full px-4 py-2 bg-blue-600 text-white rounded-lg shadow-lg hover:bg-blue-700 transition-colors">
+                                            🔗 Share
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="absolute top-2 left-2 bg-black bg-opacity-70 text-white px-2 py-1 rounded text-xs">
+                                    Image <span x-text="index + 1"></span>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="text-center mt-12 text-gray-500">
+            <p>Powered by <a href="#" class="text-blue-600 hover:text-blue-800">Fal AI</a> | 
+               <a href="/gallery" class="text-blue-600 hover:text-blue-800">View Gallery</a> | 
+               <a href="/health" class="text-blue-600 hover:text-blue-800">API Status</a></p>
+        </div>
+    </div>
+
+    <script>
+        function storyMaker() {
+            return {
+                faceImagePreview: null,
+                maskImagePreview: null,
+                prompt: '',
+                negativePrompt: 'bad quality, low resolution, NSFW, cartoonish, disfigured, broken limbs, blurry, distorted',
+                numImages: 4,
+                guidanceScale: 7.5,
+                numInferenceSteps: 25,
+                imageSize: '1024x1024',
+                isGenerating: false,
+                results: null,
+                apiStatus: null,
+                generationStatus: 'Initializing...',
+                progressPercent: 0,
+                estimatedTime: 30,
+                examplePrompts: [
+                    'a person reading a book under a cherry blossom tree in Kyoto, cinematic lighting, professional photography',
+                    'a person exploring a neon-lit cyberpunk city, futuristic atmosphere, high detail',
+                    'a person sitting on Mars in a futuristic space suit, sci-fi, epic landscape',
+                    'a person standing near the Eiffel Tower during sunset, wearing a scarf, romantic mood',
+                    'a person in traditional Japanese attire walking through a misty forest, ethereal atmosphere',
+                    'a person as a medieval knight in an enchanted castle, fantasy art style',
+                    'a person as a space explorer on an alien planet, cosmic background, detailed',
+                    'a person in a magical library surrounded by floating books, fantasy lighting'
+                ],
+
+                async init() {
+                    await this.checkApiStatus();
+                    this.updateEstimatedTime();
+                },
+
+                async checkApiStatus() {
+                    try {
+                        const response = await fetch('/health');
+                        this.apiStatus = await response.json();
+                    } catch (error) {
+                        console.error('Failed to check API status:', error);
+                    }
+                },
+
+                updateEstimatedTime() {
+                    this.estimatedTime = this.numImages * (this.numInferenceSteps / 2);
+                },
+
+                handleFaceImageChange(event) {
+                    const file = event.target.files[0];
+                    if (file) {
+                        if (file.size > {{ max_file_size }}) {
+                            alert('File too large. Maximum size is {{ (max_file_size / 1024 / 1024)|round }}MB');
+                            event.target.value = '';
+                            return;
+                        }
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            this.faceImagePreview = e.target.result;
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                },
+
+                handleMaskImageChange(event) {
+                    const file = event.target.files[0];
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            this.maskImagePreview = e.target.result;
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                },
+
+                clearFaceImage() {
+                    this.faceImagePreview = null;
+                    this.$refs.faceInput.value = '';
+                },
+
+                clearMaskImage() {
+                    this.maskImagePreview = null;
+                    this.$refs.maskInput.value = '';
+                },
+
+                async generateImages() {
+                    this.isGenerating = true;
+                    this.results = null;
+                    this.progressPercent = 0;
+                    this.generationStatus = 'Uploading images...';
+
+                    const formData = new FormData();
+                    formData.append('face_image', this.$refs.faceInput.files[0]);
+                    if (this.$refs.maskInput.files[0]) {
+                        formData.append('mask_image', this.$refs.maskInput.files[0]);
+                    }
+                    formData.append('prompt', this.prompt);
+                    formData.append('negative_prompt', this.negativePrompt);
+                    formData.append('num_images', this.numImages);
+                    formData.append('guidance_scale', this.guidanceScale);
+                    formData.append('num_inference_steps', this.numInferenceSteps);
+                    
+                    const [width, height] = this.imageSize.split('x');
+                    formData.append('width', width);
+                    formData.append('height', height);
+
+                    // Simulate progress
+                    const progressInterval = setInterval(() => {
+                        if (this.progressPercent < 90) {
+                            this.progressPercent += Math.random() * 10;
+                            if (this.progressPercent > 30) this.generationStatus = 'Generating with Fal AI...';
+                            if (this.progressPercent > 60) this.generationStatus = 'Processing results...';
+                            if (this.progressPercent > 80) this.generationStatus = 'Almost done...';
+                        }
+                    }, 500);
+
+                    try {
+                        const response = await fetch('/generate', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        
+                        this.results = await response.json();
+                        this.progressPercent = 100;
+                        clearInterval(progressInterval);
+                        
+                        if (this.results.success) {
+                            this.generationStatus = 'Completed successfully!';
+                        }
+                    } catch (error) {
+                        clearInterval(progressInterval);
+                        this.results = {
+                            success: false,
+                            error: 'Network error: ' + error.message
+                        };
+                    } finally {
+                        this.isGenerating = false;
+                    }
+                },
+
+                downloadImage(imageUrl, index) {
+                    const link = document.createElement('a');
+                    link.href = imageUrl;
+                    link.download = `storymaker-${Date.now()}-${index + 1}.jpg`;
+                    link.click();
+                },
+
+                async downloadAll() {
+                    if (this.results?.images) {
+                        for (let i = 0; i < this.results.images.length; i++) {
+                            await new Promise(resolve => setTimeout(resolve, 500));
+                            this.downloadImage(this.results.images[i], i);
+                        }
+                    }
+                },
+
+                async shareImage(imageUrl) {
+                    if (navigator.share) {
+                        try {
+                            await navigator.share({
+                                title: 'AI Generated Story Image',
+                                text: 'Check out this amazing AI-generated image!',
+                                url: imageUrl
+                            });
+                        } catch (error) {
+                            this.copyToClipboard(imageUrl);
+                        }
+                    } else {
+                        this.copyToClipboard(imageUrl);
+                    }
+                },
+
+                copyToClipboard(text) {
+                    navigator.clipboard.writeText(window.location.origin + text).then(() => {
+                        alert('Image URL copied to clipboard!');
+                    });
+                }
+            }
+        }
+    </script>
+</body>
+</html>
